@@ -2,9 +2,12 @@
 
 public record Agent
 {
+    private static int _id = 1;
+    public int Id = _id++;
     private const int MaxConcurrency = 10;
     public Seniority Seniority { get; init; }
     public int CurrentChats { get; set; }
+    public bool Assigned { get; set; }
 
     private int Capactiy => Convert.ToInt32(EfficiencyMultiplier * MaxConcurrency);
     public int RemainingCapactiy => Capactiy - CurrentChats;

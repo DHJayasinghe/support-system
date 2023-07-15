@@ -2,52 +2,75 @@
 
 public class Program
 {
+    private static readonly ChatSystem chatSystem = new();
+
+    public static void Main()
+    {
+        Start();
+    }
+
     public static void Start()
     {
-        // Create agents
-        var chatSystem = new ChatSystem();
+        Thread backgroundThread = new(chatSystem.StartBackgroundTasks);
+        backgroundThread.Start();
+
         chatSystem.AddAgents(new List<Agent>()
         {
-            new Agent { Seniority = Seniority.TeamLead},
+            //new Agent { Seniority = Seniority.TeamLead},
             new Agent { Seniority = Seniority.MidLevel },
             new Agent { Seniority = Seniority.MidLevel },
             new Agent { Seniority = Seniority.Junior }
         });
-
-        //// Create overflow team
-        //var overflowTeam = new List<Agent>
+        //chatSystem.AddOverflowTeam(new List<Agent>
         //{
-        //    new Agent { Seniority = Seniority.Junior, MaxConcurrency = 10, EfficiencyMultiplier = 0.4, IsAvailable = true },
-        //    new Agent { Seniority = Seniority.Junior, MaxConcurrency = 10, EfficiencyMultiplier = 0.4, IsAvailable = true },
-        //    new Agent { Seniority = Seniority.Junior, MaxConcurrency = 10, EfficiencyMultiplier = 0.4, IsAvailable = true },
-        //    new Agent { Seniority = Seniority.Junior, MaxConcurrency = 10, EfficiencyMultiplier = 0.4, IsAvailable = true },
-        //    new Agent { Seniority = Seniority.Junior, MaxConcurrency = 10, EfficiencyMultiplier = 0.4, IsAvailable = true },
-        //    new Agent { Seniority = Seniority.Junior, MaxConcurrency = 10, EfficiencyMultiplier = 0.4, IsAvailable = true }
-        //};
+        //    new Agent { Seniority = Seniority.Junior },
+        //    new Agent { Seniority = Seniority.Junior },
+        //    new Agent { Seniority = Seniority.Junior },
+        //    new Agent { Seniority = Seniority.Junior },
+        //    new Agent { Seniority = Seniority.Junior },
+        //    new Agent { Seniority = Seniority.Junior }
+        //});
 
-        //chatSystem.AddAgents(agents[0]);
-        //chatSystem.AddAgents(agents[1]);
-        //chatSystem.AddAgents(agents[2]);
-        //chatSystem.AddAgents(agents[3]);
-        //chatSystem.AddOverflowTeam(overflowTeam);
-        //chatSystem.UpdateMaxQueueLength();
-
-        var r = chatSystem.CreateChatSession(1);
-        if (r == "OK")
+        for (int userId = 1; userId < 31; userId++)
         {
-            chatSystem.ProcessChatQueue();
+            CreateNewChatWindow(userId);
+        }
+
+        // Keep the main thread running. Wait to reduce HIGH CPU usage
+        while (true) WaitASecond();
+    }
+
+    private static void CreateNewChatWindow(int userId)
+    {
+        Thread thread = new Thread(NewChatWindow);
+        thread.Start(userId);
+    }
+
+    public static void NewChatWindow(object data)
+    {
+        var userId = (int)data;
+        var response = chatSystem.CreateChatSession(userId);
+        if (response == "OK")
+        {
+            PollChatSession(chatSystem, userId);
         }
         else
         {
-            Console.WriteLine(r);
+            Console.WriteLine("No agent available at the moment");
         }
-        chatSystem.CreateChatSession(2);
-        chatSystem.CreateChatSession(3);
-        chatSystem.CreateChatSession(4);
-        chatSystem.CreateChatSession(5);
-        chatSystem.CreateChatSession(6);
-        chatSystem.CreateChatSession(7);
 
-        chatSystem.ProcessChatQueue();
     }
+
+    private static void PollChatSession(ChatSystem chatSystem, int userId)
+    {
+        while (true)
+        {
+            chatSystem.KeepSessionActive(userId);
+            WaitASecond();
+        }
+    }
+
+    private static void WaitASecond() => Thread.Sleep(1000);
 }
+
+

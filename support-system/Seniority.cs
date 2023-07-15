@@ -2,9 +2,8 @@
 
 public enum Seniority
 {
-    Junior = 0,
-    MidLevel = 1,
-    Senior = 2,
-    TeamLead = 3
+    Junior = 1,
+    MidLevel = 2,
+    Senior = 3,
+    TeamLead = 4
 }
-

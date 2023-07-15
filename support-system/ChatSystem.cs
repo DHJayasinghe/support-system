@@ -4,51 +4,40 @@ namespace TicketSystem;
 
 public class ChatSystem
 {
-    //private readonly ConcurrentDictionary<int,>
-    private readonly Queue<ChatSession> chatQueue;
-    private readonly List<Agent> _agents;
-    private readonly List<Agent> overflowTeam;
-    private int maxQueueLength;
-    private int currentSessionId;
-
-    public ChatSystem()
-    {
-        chatQueue = new Queue<ChatSession>();
-        _agents = new List<Agent>();
-        overflowTeam = new List<Agent>();
-        maxQueueLength = 0;
-        currentSessionId = 1;
-    }
+    private readonly ConcurrentDictionary<int, DateTime> UserActivityLog = new();
+    private readonly ConcurrentDictionary<int, ChatSession> ChatSessions = new();
+    private readonly ConcurrentQueue<int> sessions = new();
+    private readonly List<Agent> _agents = new();
+    private readonly List<Agent> overflowTeam = new();
+    private int maxQueueLength = 0;
+    private int noOfActiveSessions = 0;
 
     public void AddAgents(IEnumerable<Agent> agents) => _agents.AddRange(agents);
 
-    public void AddOverflowTeam(List<Agent> team)
-    {
-        overflowTeam.AddRange(team);
-    }
+    public void AddOverflowTeam(IEnumerable<Agent> team) => overflowTeam.AddRange(team);
 
     public string CreateChatSession(int userId)
     {
+        CalculateCapacity();
         if (IsMaximumQueueReached() && IsOfficeHours())
             AssignOverflowTeam();
 
-        if (IsMaximumQueueReached()) return ChatRefusedMessage();
+        if (IsMaximumQueueReached()) return "NOK";
 
         var session = new ChatSession
         {
-            Id = currentSessionId++,
+            Id = userId,
         };
-        chatQueue.Enqueue(session);
-        AssignChatToAgent(session);
+        noOfActiveSessions++;
+        sessions.Enqueue(session.Id);
+        ChatSessions.TryAdd(userId, session);
+        UserActivityLog.TryAdd(userId, DateTime.UtcNow);
+        Console.WriteLine("Queue session {0}", session.Id);
+
         return "OK";
     }
 
-    private static string ChatRefusedMessage() => "Chat is refused. Queue is full.";
-
-    private bool IsMaximumQueueReached()
-    {
-        return maxQueueLength == chatQueue.Count;
-    }
+    private bool IsMaximumQueueReached() => maxQueueLength == noOfActiveSessions;
 
     private static bool IsOfficeHours()
     {
@@ -58,7 +47,23 @@ public class ChatSystem
 
     private void AssignOverflowTeam()
     {
-        // TODO: assign overflow team to available agent pool
+        if (overflowTeam.Any(agent => !agent.Assigned)) return;
+        Console.WriteLine("Assigning overflow team...");
+
+        _agents.AddRange(overflowTeam);
+        overflowTeam.ForEach(agent => agent.Assigned = true);
+        CalculateCapacity();
+    }
+
+    private void UnAssignOverflowTeam()
+    {
+        if (overflowTeam.Any(agent => agent.Assigned)) return;
+        Console.WriteLine("Assigning overflow team...");
+        overflowTeam.ForEach(agent =>
+        {
+            _agents.Remove(agent);
+            agent.Assigned = false;
+        });
         CalculateCapacity();
     }
 
@@ -70,6 +75,7 @@ public class ChatSystem
         {
             agentToAssign.CurrentChats++;
             session.AssignedAgent = agentToAssign;
+            Console.WriteLine("Assigining chat session {0} -> agent {1} ({2})", session.Id, session.AssignedAgent.Id, session.AssignedAgent.Seniority);
         }
         else
         {
@@ -79,51 +85,69 @@ public class ChatSystem
 
     private Agent RoundRobinAgentPick() => _agents
         .Where(agent => agent.IsAvailable)
-        .OrderBy(agent => agent.Seniority)
-        .OrderBy(agent => agent.CurrentChats)
+        .OrderBy(agent => int.Parse($"{(int)agent.Seniority}{agent.CurrentChats}"))
         .FirstOrDefault();
 
-    public void ProcessChatQueue()
+    private bool AgentAreAvailable() => _agents.Any(agent => agent.IsAvailable);
+
+    public void KeepSessionActive(int userId)
     {
-        while (chatQueue.Count > 0)
+        UserActivityLog.AddOrUpdate(userId, DateTime.UtcNow, (_, _) => DateTime.UtcNow);
+    }
+    public void StartBackgroundTasks()
+    {
+        while (true)
         {
-            var session = chatQueue.Peek();
-            if (session.IsActive)
+            MonitorAndAssignToAvailableAgents();
+            MonitorAndRemoveInactiveSessions();
+            Thread.Sleep(1000);
+        }
+    }
+    private void MonitorAndAssignToAvailableAgents()
+    {
+        if (!sessions.Any())
+        {
+            //Console.WriteLine("No sessions to assign");
+            return;
+        }
+        if (!AgentAreAvailable())
+        {
+            //Console.WriteLine("Agents are busy. Waiting for agents to be available");
+            return;
+        }
+        if (!sessions.Any()) return;
+
+        sessions.TryDequeue(out int sessionId);
+        //Console.WriteLine("Assiging chat session: {0}", sessionId);
+        var session = ChatSessions[sessionId];
+        AssignChatToAgent(session);
+    }
+
+    private void MonitorAndRemoveInactiveSessions()
+    {
+        foreach (var activity in UserActivityLog)
+        {
+            if (IfLastActivityWas3SecsAgo(activity))
             {
-                Console.WriteLine($"Processing chat session {session.Id}");
-                session.IsActive = false;
-                PollChatSession(session);
-            }
-            else
-            {
-                chatQueue.Dequeue();
+                var sessionId = activity.Key;
+                Console.WriteLine("Session {0} is inactive. Marking as inactive.", sessionId);
+                var session = ChatSessions[sessionId];
+                session.MarkInactive();
+                UserActivityLog.TryRemove(sessionId, out _);
+                noOfActiveSessions--;
             }
         }
     }
 
-    private void PollChatSession(ChatSession session)
+    private static bool IfLastActivityWas3SecsAgo(KeyValuePair<int, DateTime> activity)
     {
-        int pollCount = 0;
-        while (pollCount < 3 && session.IsActive)
-        {
-            // Poll the chat session
-            // If response is OK, set session.IsActive = true; to keep it active
-            // Otherwise, increment pollCount
-
-            pollCount++;
-            Thread.Sleep(1000); // Wait for 1 second before polling again
-        }
-
-        if (pollCount >= 3)
-        {
-            session.AssignedAgent.CurrentChats--;
-            //session.AssignedAgent.IsAvailable = true;
-            Console.WriteLine($"Chat session {session.Id} marked as inactive.");
-        }
+        return DateTime.UtcNow.Subtract(activity.Value).Seconds > 3;
     }
 
     private void CalculateCapacity()
     {
+        //Console.WriteLine("Capacity re-calculating...");
         maxQueueLength = (int)(_agents.Sum(agent => agent.RemainingCapactiy) * 1.5);
+        //Console.WriteLine("Capacity is {0}", maxQueueLength);
     }
 }
