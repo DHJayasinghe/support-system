@@ -3,6 +3,7 @@
 public class Program
 {
     private static readonly ChatSystem chatSystem = new();
+    private static readonly Random randomTimeWindows = new Random();
 
     public static void Main()
     {
@@ -19,19 +20,20 @@ public class Program
             //new Agent { Seniority = Seniority.TeamLead},
             new Agent { Seniority = Seniority.MidLevel },
             new Agent { Seniority = Seniority.MidLevel },
+            new Agent { Seniority = Seniority.Junior },
             new Agent { Seniority = Seniority.Junior }
         });
-        //chatSystem.AddOverflowTeam(new List<Agent>
-        //{
-        //    new Agent { Seniority = Seniority.Junior },
-        //    new Agent { Seniority = Seniority.Junior },
-        //    new Agent { Seniority = Seniority.Junior },
-        //    new Agent { Seniority = Seniority.Junior },
-        //    new Agent { Seniority = Seniority.Junior },
-        //    new Agent { Seniority = Seniority.Junior }
-        //});
+        chatSystem.AddOverflowTeam(new List<Agent>
+        {
+            new Agent { Seniority = Seniority.Junior },
+            //new Agent { Seniority = Seniority.Junior },
+            //new Agent { Seniority = Seniority.Junior },
+            //new Agent { Seniority = Seniority.Junior },
+            //new Agent { Seniority = Seniority.Junior },
+            //new Agent { Seniority = Seniority.Junior }
+        });
 
-        for (int userId = 1; userId < 31; userId++)
+        for (int userId = 1; userId < 35; userId++)
         {
             CreateNewChatWindow(userId);
         }
@@ -42,30 +44,30 @@ public class Program
 
     private static void CreateNewChatWindow(int userId)
     {
-        Thread thread = new Thread(NewChatWindow);
-        thread.Start(userId);
-    }
-
-    public static void NewChatWindow(object data)
-    {
-        var userId = (int)data;
         var response = chatSystem.CreateChatSession(userId);
+        Console.Write("Create session {0} -> ", userId);
         if (response == "OK")
         {
-            PollChatSession(chatSystem, userId);
+            var thread = new Thread(PollChatSession);
+            thread.Start(userId);
+            Console.Write("OK");
         }
         else
         {
-            Console.WriteLine("No agent available at the moment");
+            Console.Write("No agent available at the moment");
         }
-
+        Console.WriteLine();
     }
 
-    private static void PollChatSession(ChatSystem chatSystem, int userId)
+    private static void PollChatSession(object data)
     {
-        while (true)
+        var userId = (int)data;
+        var startTime = DateTime.UtcNow;
+        var durationToKeepChatWindowLive = TimeSpan.FromMinutes(randomTimeWindows.Next(1, 3));
+        while (DateTime.UtcNow - startTime < durationToKeepChatWindowLive)
         {
-            chatSystem.KeepSessionActive(userId);
+            var r = chatSystem.KeepSessionActive(userId);
+            if (r == "WAITING") startTime = DateTime.UtcNow; // just keep the session little longer for testing
             WaitASecond();
         }
     }

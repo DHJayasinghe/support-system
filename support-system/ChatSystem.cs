@@ -11,16 +11,20 @@ public class ChatSystem
     private readonly List<Agent> overflowTeam = new();
     private int maxQueueLength = 0;
     private int noOfActiveSessions = 0;
+    private int noOfSessionsWaiting = 0;
 
     public void AddAgents(IEnumerable<Agent> agents) => _agents.AddRange(agents);
 
-    public void AddOverflowTeam(IEnumerable<Agent> team) => overflowTeam.AddRange(team);
+    public void AddOverflowTeam(IEnumerable<Agent> team)
+    {
+        team.ToList().ForEach(agent => agent.Tag = "OVERFLOW");
+        overflowTeam.AddRange(team);
+    }
 
     public string CreateChatSession(int userId)
     {
         CalculateCapacity();
-        if (IsMaximumQueueReached() && IsOfficeHours())
-            AssignOverflowTeam();
+        if (IsMaximumQueueReached() && IsOfficeHours()) AssignOverflowTeam();
 
         if (IsMaximumQueueReached()) return "NOK";
 
@@ -28,26 +32,38 @@ public class ChatSystem
         {
             Id = userId,
         };
+        AddToSessionQueue(userId, session);
+
+        return "OK";
+    }
+
+    private void AddToSessionQueue(int userId, ChatSession session)
+    {
         noOfActiveSessions++;
         sessions.Enqueue(session.Id);
         ChatSessions.TryAdd(userId, session);
         UserActivityLog.TryAdd(userId, DateTime.UtcNow);
-        Console.WriteLine("Queue session {0}", session.Id);
-
-        return "OK";
     }
 
     private bool IsMaximumQueueReached() => maxQueueLength == noOfActiveSessions;
 
     private static bool IsOfficeHours()
     {
-        // TODO: office hours check
-        return true;
+        var officeStartTime = new TimeSpan(8, 30, 0);  // 09:00 AM
+        var officeEndTime = new TimeSpan(18, 0, 0); // 06:00 PM
+
+        var currentTime = DateTime.Now; // Get the current local time
+        var officeStartDateTime = new DateTime(currentTime.Year, currentTime.Month, currentTime.Day, officeStartTime.Hours, officeStartTime.Minutes, officeStartTime.Seconds);
+        var officeEndDateTime = new DateTime(currentTime.Year, currentTime.Month, currentTime.Day, officeEndTime.Hours, officeEndTime.Minutes, officeEndTime.Seconds);
+
+        var isOfficeHours = currentTime >= officeStartDateTime && currentTime < officeEndDateTime;
+        Console.WriteLine("Office hours: {0}", isOfficeHours);
+        return isOfficeHours;
     }
 
     private void AssignOverflowTeam()
     {
-        if (overflowTeam.Any(agent => !agent.Assigned)) return;
+        if (!overflowTeam.Any() || !overflowTeam.Any(agent => !agent.Assigned)) return;
         Console.WriteLine("Assigning overflow team...");
 
         _agents.AddRange(overflowTeam);
@@ -67,15 +83,16 @@ public class ChatSystem
         CalculateCapacity();
     }
 
-    private void AssignChatToAgent(ChatSession session)
+    private void AssignChatToAgent(int sessionId)
     {
+        var session = ChatSessions[sessionId];
         var agentToAssign = RoundRobinAgentPick();
 
         if (agentToAssign != null)
         {
             agentToAssign.CurrentChats++;
             session.AssignedAgent = agentToAssign;
-            Console.WriteLine("Assigining chat session {0} -> agent {1} ({2})", session.Id, session.AssignedAgent.Id, session.AssignedAgent.Seniority);
+            Console.WriteLine("Session {0} -> Assigning agent {1} ({2}/{3})", session.Id, session.AssignedAgent.Id, session.AssignedAgent.Seniority, session.AssignedAgent.Tag);
         }
         else
         {
@@ -85,14 +102,17 @@ public class ChatSystem
 
     private Agent RoundRobinAgentPick() => _agents
         .Where(agent => agent.IsAvailable)
-        .OrderBy(agent => int.Parse($"{(int)agent.Seniority}{agent.CurrentChats}"))
+        .OrderBy(agent => agent.AssignmentHashCode)
         .FirstOrDefault();
 
     private bool AgentAreAvailable() => _agents.Any(agent => agent.IsAvailable);
 
-    public void KeepSessionActive(int userId)
+    public string KeepSessionActive(int userId)
     {
         UserActivityLog.AddOrUpdate(userId, DateTime.UtcNow, (_, _) => DateTime.UtcNow);
+        ChatSessions.TryGetValue(userId, out ChatSession session);
+        if (session.AssignedAgent != null) return "ACTIVE";
+        return "WAITING";
     }
     public void StartBackgroundTasks()
     {
@@ -105,22 +125,16 @@ public class ChatSystem
     }
     private void MonitorAndAssignToAvailableAgents()
     {
-        if (!sessions.Any())
+        if (!sessions.Any()) return;  // No sessions to assign
+        while (AgentAreAvailable())
         {
-            //Console.WriteLine("No sessions to assign");
-            return;
+            if (sessions.TryDequeue(out int sessionId)) AssignChatToAgent(sessionId);
         }
-        if (!AgentAreAvailable())
+        if (sessions.Any() && noOfSessionsWaiting != sessions.Count)
         {
-            //Console.WriteLine("Agents are busy. Waiting for agents to be available");
-            return;
+            noOfSessionsWaiting = sessions.Count;
+            Console.WriteLine("{0} sessions waiting on the queue", noOfSessionsWaiting);
         }
-        if (!sessions.Any()) return;
-
-        sessions.TryDequeue(out int sessionId);
-        //Console.WriteLine("Assiging chat session: {0}", sessionId);
-        var session = ChatSessions[sessionId];
-        AssignChatToAgent(session);
     }
 
     private void MonitorAndRemoveInactiveSessions()
@@ -130,9 +144,10 @@ public class ChatSystem
             if (IfLastActivityWas3SecsAgo(activity))
             {
                 var sessionId = activity.Key;
-                Console.WriteLine("Session {0} is inactive. Marking as inactive.", sessionId);
+                Console.WriteLine("Session {0} (Inactive) -> Ending chat", sessionId);
                 var session = ChatSessions[sessionId];
                 session.MarkInactive();
+                session.AssignedAgent.UnAssignChat();
                 UserActivityLog.TryRemove(sessionId, out _);
                 noOfActiveSessions--;
             }
