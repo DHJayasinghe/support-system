@@ -18,10 +18,10 @@ public class Program
         chatSystem.AddAgents(new List<Agent>()
         {
             //new Agent { Seniority = Seniority.TeamLead},
-            new Agent { Seniority = Seniority.MidLevel, ShiftId = "DAYSHIFT2" },
-            new Agent { Seniority = Seniority.MidLevel, ShiftId = "DAYSHIFT2" },
-            new Agent { Seniority = Seniority.Junior, ShiftId = "DAYSHIFT2" },
-            new Agent { Seniority = Seniority.Junior, ShiftId = "DAYSHIFT2" }
+            new Agent { Seniority = Seniority.MidLevel, ShiftId = "DAYSHIFT1" },
+            //new Agent { Seniority = Seniority.MidLevel, ShiftId = "DAYSHIFT1" },
+            new Agent { Seniority = Seniority.Junior, ShiftId = "DAYSHIFT1" },
+            new Agent { Seniority = Seniority.Junior, ShiftId = "DAYSHIFT1" }
         });
         chatSystem.AddOverflowTeam(new List<Agent>
         {
