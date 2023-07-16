@@ -15,39 +15,43 @@ namespace support_system_unittest
     public class SupportSystemUnitTests
     {
         private ChatSystem _sut;
-        private readonly List<Agent> teamA = new()
-        {
-            new Agent { Seniority = Seniority.Junior, ShiftId = Shift.MORNING },
-            new Agent { Seniority = Seniority.MidLevel, ShiftId = Shift.MORNING },
-            new Agent { Seniority = Seniority.MidLevel, ShiftId = Shift.MORNING },
-            new Agent { Seniority = Seniority.TeamLead, ShiftId = Shift.MORNING }
-        };
-        private readonly List<Agent> teamB = new()
-        {
-            new Agent { Seniority = Seniority.Junior, ShiftId = Shift.AFTERNOON },
-            new Agent { Seniority = Seniority.Junior, ShiftId = Shift.AFTERNOON },
-            new Agent { Seniority = Seniority.MidLevel, ShiftId = Shift.AFTERNOON },
-            new Agent { Seniority = Seniority.Senior, ShiftId = Shift.AFTERNOON }
-        };
-        private readonly List<Agent> teamC = new()
-        {
-            new Agent { Seniority = Seniority.MidLevel, ShiftId = Shift.NIGHT },
-            new Agent { Seniority = Seniority.MidLevel, ShiftId = Shift.NIGHT }
-        };
-        private readonly List<Agent> overflowTeam = new()
-        {
-            new Agent { Seniority = Seniority.Junior, ShiftId = Shift.MORNING },
-            new Agent { Seniority = Seniority.Junior, ShiftId = Shift.MORNING },
-            new Agent { Seniority = Seniority.Junior, ShiftId = Shift.MORNING },
-            new Agent { Seniority = Seniority.Junior, ShiftId = Shift.MORNING },
-            new Agent { Seniority = Seniority.Junior, ShiftId = Shift.MORNING },
-            new Agent { Seniority = Seniority.Junior, ShiftId = Shift.MORNING }
-        };
+        private List<Agent> teamA;
+        private List<Agent> teamB;
+        private List<Agent> teamC;
+        private List<Agent> overflowTeam;
 
         [TestInitialize]
         public void Initialize()
         {
             _sut = new();
+            teamA = new()
+            {
+                new Agent { Seniority = Seniority.Junior, ShiftId = Shift.MORNING },
+                new Agent { Seniority = Seniority.MidLevel, ShiftId = Shift.MORNING },
+                new Agent { Seniority = Seniority.MidLevel, ShiftId = Shift.MORNING },
+                new Agent { Seniority = Seniority.TeamLead, ShiftId = Shift.MORNING }
+            };
+            teamB = new()
+            {
+                new Agent { Seniority = Seniority.Junior, ShiftId = Shift.AFTERNOON },
+                new Agent { Seniority = Seniority.Junior, ShiftId = Shift.AFTERNOON },
+                new Agent { Seniority = Seniority.MidLevel, ShiftId = Shift.AFTERNOON },
+                new Agent { Seniority = Seniority.Senior, ShiftId = Shift.AFTERNOON }
+            };
+            teamC = new()
+            {
+                new Agent { Seniority = Seniority.MidLevel, ShiftId = Shift.NIGHT },
+                new Agent { Seniority = Seniority.MidLevel, ShiftId = Shift.NIGHT }
+            };
+            overflowTeam = new()
+            {
+                new Agent { Seniority = Seniority.Junior, ShiftId = Shift.OFFICEHOURS },
+                new Agent { Seniority = Seniority.Junior, ShiftId = Shift.OFFICEHOURS },
+                new Agent { Seniority = Seniority.Junior, ShiftId = Shift.OFFICEHOURS },
+                new Agent { Seniority = Seniority.Junior, ShiftId = Shift.OFFICEHOURS },
+                new Agent { Seniority = Seniority.Junior, ShiftId = Shift.OFFICEHOURS },
+                new Agent { Seniority = Seniority.Junior, ShiftId = Shift.OFFICEHOURS }
+            };
         }
 
         [TestMethod]
@@ -258,11 +262,11 @@ namespace support_system_unittest
         public void Should_AssignedOverflowTeamMustUnassign_When_OfficeHoursEnd()
         {
             int capacity = (int)(teamB.Sum(agent => agent.Capactiy) * ChatSystem.QUEUELENGTHMULTIPLIER);
-            var overflowTeam = new List<Agent>()
-            {
-                new Agent { Seniority = Seniority.Junior, ShiftId = Shift.AFTERNOON },
-                new Agent { Seniority = Seniority.Junior, ShiftId = Shift.AFTERNOON }
-            };
+            //var overflowTeam = new List<Agent>()
+            //{
+            //    new Agent { Seniority = Seniority.Junior, ShiftId = Shift.AFTERNOON },
+            //    new Agent { Seniority = Seniority.Junior, ShiftId = Shift.AFTERNOON }
+            //};
             _sut.AddTeam(teamB);
             _sut.AddOverflowTeam(overflowTeam);
             var activeAgentsCountBefore = 0;
