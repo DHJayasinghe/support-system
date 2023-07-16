@@ -3,7 +3,7 @@
 public class Program
 {
     private static readonly ChatSystem chatSystem = new();
-    private static readonly Random randomTimeWindows = new Random();
+    private static readonly Random randomTimeWindows = new();
 
     public static void Main()
     {
@@ -18,14 +18,14 @@ public class Program
         chatSystem.AddAgents(new List<Agent>()
         {
             //new Agent { Seniority = Seniority.TeamLead},
-            new Agent { Seniority = Seniority.MidLevel },
-            new Agent { Seniority = Seniority.MidLevel },
-            new Agent { Seniority = Seniority.Junior },
-            new Agent { Seniority = Seniority.Junior }
+            new Agent { Seniority = Seniority.MidLevel, ShiftId = "DAYSHIFT2" },
+            new Agent { Seniority = Seniority.MidLevel, ShiftId = "DAYSHIFT2" },
+            new Agent { Seniority = Seniority.Junior, ShiftId = "DAYSHIFT2" },
+            new Agent { Seniority = Seniority.Junior, ShiftId = "DAYSHIFT2" }
         });
         chatSystem.AddOverflowTeam(new List<Agent>
         {
-            new Agent { Seniority = Seniority.Junior },
+            new Agent { Seniority = Seniority.Junior,ShiftId = "DAYSHIFT1" },
             //new Agent { Seniority = Seniority.Junior },
             //new Agent { Seniority = Seniority.Junior },
             //new Agent { Seniority = Seniority.Junior },

@@ -9,6 +9,7 @@ public record Agent
     public int CurrentChats { get; set; }
     public bool Assigned { get; set; }
     public string Tag { get; set; } = "REGULAR";
+    public string ShiftId { get; set; } = "DAYSHIFT1";
 
     private int Capactiy => Convert.ToInt32(EfficiencyMultiplier * MaxConcurrency);
     public int RemainingCapactiy => Capactiy - CurrentChats;

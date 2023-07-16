@@ -8,17 +8,23 @@ public class ChatSystem
     private readonly ConcurrentDictionary<int, ChatSession> ChatSessions = new();
     private readonly ConcurrentQueue<int> sessions = new();
     private readonly List<Agent> _agents = new();
-    private readonly List<Agent> overflowTeam = new();
+    private readonly List<Shift> _shifts = new()
+    {
+        new Shift { Id = "DAYSHIFT1", StartTime = new TimeSpan(6, 0, 0), EndTime = new TimeSpan(14, 0, 0, 0) },
+        new Shift { Id = "DAYSHIFT2", StartTime = new TimeSpan(14, 0, 0), EndTime = new TimeSpan(22, 0, 0, 0) },
+        new Shift { Id = "NIGHTSHIFT2", StartTime = new TimeSpan(22, 0, 0), EndTime = new TimeSpan(6, 0, 0, 0) },
+    };
     private int maxQueueLength = 0;
     private int noOfActiveSessions = 0;
     private int noOfSessionsWaiting = 0;
+    private bool overflowTeamEnabled = false;
 
     public void AddAgents(IEnumerable<Agent> agents) => _agents.AddRange(agents);
 
     public void AddOverflowTeam(IEnumerable<Agent> team)
     {
         team.ToList().ForEach(agent => agent.Tag = "OVERFLOW");
-        overflowTeam.AddRange(team);
+        _agents.AddRange(team);
     }
 
     public string CreateChatSession(int userId)
@@ -63,23 +69,17 @@ public class ChatSystem
 
     private void AssignOverflowTeam()
     {
-        if (!overflowTeam.Any() || !overflowTeam.Any(agent => !agent.Assigned)) return;
-        Console.WriteLine("Assigning overflow team...");
+        if (overflowTeamEnabled) return;
+        Console.WriteLine("Enabling overflow team...");
 
-        _agents.AddRange(overflowTeam);
-        overflowTeam.ForEach(agent => agent.Assigned = true);
+        overflowTeamEnabled = true;
         CalculateCapacity();
     }
 
     private void UnAssignOverflowTeam()
     {
-        if (overflowTeam.Any(agent => agent.Assigned)) return;
-        Console.WriteLine("Assigning overflow team...");
-        overflowTeam.ForEach(agent =>
-        {
-            _agents.Remove(agent);
-            agent.Assigned = false;
-        });
+        Console.WriteLine("Disabling overflow team...");
+        overflowTeamEnabled = false;
         CalculateCapacity();
     }
 
@@ -100,7 +100,9 @@ public class ChatSystem
         }
     }
 
-    private Agent RoundRobinAgentPick() => _agents
+    private Agent RoundRobinAgentPick() => _agents.Join(_shifts, agent => agent.ShiftId, shift => shift.Id, (agent, shift) => (agent, shift))
+        .Where(d => d.shift.IsCurrent)
+        .Select(d => d.agent)
         .Where(agent => agent.IsAvailable)
         .OrderBy(agent => agent.AssignmentHashCode)
         .FirstOrDefault();
@@ -162,7 +164,20 @@ public class ChatSystem
     private void CalculateCapacity()
     {
         //Console.WriteLine("Capacity re-calculating...");
-        maxQueueLength = (int)(_agents.Sum(agent => agent.RemainingCapactiy) * 1.5);
+        maxQueueLength = (int)(_agents.Join(_shifts, agent => agent.ShiftId, shift => shift.Id, (agent, shift) => (agent, shift))
+            .Where(d => d.shift.IsCurrent)
+            .Select(d => d.agent)
+            .Where(agent => overflowTeamEnabled ? agent.Tag == agent.Tag : agent.Tag != "OVERFLOW")
+            .Sum(agent => agent.RemainingCapactiy) * 1.5);
         //Console.WriteLine("Capacity is {0}", maxQueueLength);
     }
+}
+
+public class Shift
+{
+    public string Id { get; set; }
+    public TimeSpan StartTime { get; set; }
+    public TimeSpan EndTime { get; set; }
+    public string Tag { get; set; } = "DAY";
+    public bool IsCurrent => DateTime.Now.TimeOfDay >= StartTime && DateTime.Now.TimeOfDay < EndTime;
 }
