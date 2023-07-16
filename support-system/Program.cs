@@ -15,22 +15,15 @@ public class Program
         Thread backgroundThread = new(chatSystem.StartBackgroundTasks);
         backgroundThread.Start();
 
-        chatSystem.AddAgents(new List<Agent>()
+        chatSystem.AddTeam(new List<Agent>()
         {
-            //new Agent { Seniority = Seniority.TeamLead},
-            new Agent { Seniority = Seniority.MidLevel, ShiftId = "DAYSHIFT1" },
-            //new Agent { Seniority = Seniority.MidLevel, ShiftId = "DAYSHIFT1" },
-            new Agent { Seniority = Seniority.Junior, ShiftId = "DAYSHIFT1" },
-            new Agent { Seniority = Seniority.Junior, ShiftId = "DAYSHIFT1" }
+            new Agent { Seniority = Seniority.MidLevel, ShiftId = Shift.MORNING },
+            new Agent { Seniority = Seniority.Junior, ShiftId = Shift.MORNING },
+            new Agent { Seniority = Seniority.Junior, ShiftId = Shift.MORNING }
         });
         chatSystem.AddOverflowTeam(new List<Agent>
         {
-            new Agent { Seniority = Seniority.Junior,ShiftId = "DAYSHIFT1" },
-            //new Agent { Seniority = Seniority.Junior },
-            //new Agent { Seniority = Seniority.Junior },
-            //new Agent { Seniority = Seniority.Junior },
-            //new Agent { Seniority = Seniority.Junior },
-            //new Agent { Seniority = Seniority.Junior }
+            new Agent { Seniority = Seniority.Junior,ShiftId = Shift.MORNING },
         });
 
         for (int userId = 1; userId < 35; userId++)
@@ -66,7 +59,7 @@ public class Program
         var durationToKeepChatWindowLive = TimeSpan.FromMinutes(randomTimeWindows.Next(1, 3));
         while (DateTime.UtcNow - startTime < durationToKeepChatWindowLive)
         {
-            var r = chatSystem.KeepSessionActive(userId);
+            var r = chatSystem.PollChatSession(userId);
             if (r == "WAITING") startTime = DateTime.UtcNow; // just keep the session little longer for testing
             WaitASecond();
         }

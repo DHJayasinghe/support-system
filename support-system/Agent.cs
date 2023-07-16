@@ -2,16 +2,16 @@
 
 public record Agent
 {
+    private const int MAX_CONCURRENCY = 10;
     private static int _id = 1;
     public int Id { get; private set; }
-    private const int MaxConcurrency = 10;
     public Seniority Seniority { get; init; }
     public int CurrentChats { get; set; }
     public bool Assigned { get; set; }
     public string Tag { get; set; } = "REGULAR";
-    public string ShiftId { get; set; } = "DAYSHIFT1";
+    public string ShiftId { get; set; } = Shift.MORNING;
 
-    private int Capactiy => Convert.ToInt32(EfficiencyMultiplier * MaxConcurrency);
+    public int Capactiy => Convert.ToInt32(EfficiencyMultiplier * MAX_CONCURRENCY);
     public int RemainingCapactiy => Capactiy - CurrentChats;
     public bool IsAvailable => RemainingCapactiy > 0;
     public double EfficiencyMultiplier => Seniority switch
